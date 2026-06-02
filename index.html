@@ -22,7 +22,7 @@ h1{font-size:22px;margin:0}
 .card{background:var(--card);border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,.08);padding:20px;margin-top:10px}
 .row{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin:10px 0}
 label{font-weight:600}
-/* font-size: 16px zapobiega uciążliwemu zoomowaniu ekranu w Safari na iOS */
+/* Rozmiar font-size: 16px zapobiega automatycznemu przybliżaniu ekranu (zoom) w Safari na iPad/iPhone */
 input[type="text"], input[type="number"]{padding:10px 12px;border-radius:10px;border:1px solid var(--border);min-width:120px;font-size:16px}
 .btn{padding:12px 18px;border:none;border-radius:999px;background:var(--btn);cursor:pointer;font-weight:700;box-shadow:0 6px 0 #f3be4a;transition:.15s}
 .btn:hover{background:var(--btn-hover)}
@@ -554,10 +554,13 @@ function renderQuestion(){
       box.appendChild(btn);
     });
   }else{
-    // Konfiguracja pod iOS: zwykła klawiatura, ale domyślnie otwarta na cyfrach z zachowanym klawiszem Enter
+    // Konfiguracja pod iOS/Android: brak atrybutu inputmode zapobiega kastrowaniu klawisza Enter.
+    // Zachowujemy czysty type="text" z wyłączeniem autokorekty dla tekstów niesłownikowych.
     const inp=document.createElement('input'); 
     inp.type='text'; 
-    inp.inputMode='decimal';
+    inp.autocorrect='off';
+    inp.autocapitalize='off';
+    inp.spellcheck=false;
     inp.placeholder='Wpisz wynik i Enter'; 
     inp.autofocus=true;
     
@@ -606,7 +609,7 @@ function nextOrFinishStandard(){
 }
 function nextChallenge(){
   currentQ++;
-  if(currentQ>=QUIZ.length){ currentQ=0; } 
+  if(currentQ>=QUIZ.length){ currentQ=0; } // recykling puli
   renderQuestion();
 }
 
@@ -632,6 +635,7 @@ function startGame(){
   if(!anyOps){ alert('Zaznacz przynajmniej jedno działanie.'); return; }
 
   SETTINGS.ops = { add: $('#opAdd').checked, sub: $('#opSub').checked, mul: $('#opMul').checked, div: $('#opDiv').checked };
+  // Persist last state right before starting
   saveLastState();
 
   buildQuiz();
@@ -650,6 +654,7 @@ function startGame(){
 
 $('#startBtn').addEventListener('click', startGame);
 $('#playAgainBtn').addEventListener('click', ()=>{
+  // Return to start with last settings applied, no auto-start
   stopTimer();
   const st = loadLastState();
   $('#quizCard').classList.add('hidden');
@@ -661,7 +666,7 @@ $('#showReviewBtn').addEventListener('click', ()=>{
   const box=$('#reviewList');
   if(review.length===0){ box.innerHTML='<div class="note">Brak danych.</div>'; }
   else { box.innerHTML = review.map((r,i)=>`<div class="review-item"><b>${i+1}.</b> ${r.q}<br><span class="note">Poprawna:</span> <b>${r.correct}</b></div>`).join(''); }
-  $('#reviewContainer').classList.toggle('hidden');
+  $('#reviewContainer').toggle('hidden');
 });
 
 // Init results
