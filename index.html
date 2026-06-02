@@ -22,8 +22,7 @@ h1{font-size:22px;margin:0}
 .card{background:var(--card);border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,.08);padding:20px;margin-top:10px}
 .row{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin:10px 0}
 label{font-weight:600}
-/* Rozmiar font-size: 16px zapobiega automatycznemu przybliżaniu ekranu (zoom) w Safari na iPad/iPhone */
-input[type="text"], input[type="number"]{padding:10px 12px;border-radius:10px;border:1px solid var(--border);min-width:120px;font-size:16px}
+input[type="text"], input[type="number"]{padding:10px 12px;border-radius:10px;border:1px solid var(--border);min-width:120px}
 .btn{padding:12px 18px;border:none;border-radius:999px;background:var(--btn);cursor:pointer;font-weight:700;box-shadow:0 6px 0 #f3be4a;transition:.15s}
 .btn:hover{background:var(--btn-hover)}
 .btn:active{transform:translateY(1px);box-shadow:0 5px 0 #f3be4a}
@@ -445,11 +444,13 @@ function makeOperands(op, limit, type){
   while(true){
     tries++; if(tries>500) break;
     if(op==='mul'){
+      // Czynniki ograniczone mulRange; wynik dodatkowo ograniczony globalnym limit
       if(isInt){ a=randInt(0, SETTINGS.mulRange); b=randInt(0, SETTINGS.mulRange); }
       else { a=randStep(0, SETTINGS.mulRange, step); b=randStep(0, SETTINGS.mulRange, step); }
       res = a*b;
       if(res<=limit){ return [a,b,res]; }
     }else if(op==='div'){
+      // Dzielnik i wynik (iloraz) ograniczone mulRange; dzielna = dzielnik*iloraz, a <= globalny limit
       if(isInt){
         b = randInt(1, Math.max(1, SETTINGS.mulRange));     // dzielnik
         const k = randInt(0, SETTINGS.mulRange);             // iloraz (wynik)
@@ -531,6 +532,7 @@ function setProgress(answered, total){ const pct = total>0 ? Math.round(100*answ
 function startTimerStandard(){ elapsed=0; $('#timer').textContent='00:00'; timerInt=setInterval(()=>{ elapsed++; $('#timer').textContent=fmtTime(elapsed); },1000); }
 function startTimerChallenge(totalSeconds){
   let left = totalSeconds; elapsed = 0; $('#timer').textContent = fmtTime(left);
+  // Inicjalny widok wyniku w trybie wyzwania
   $('#score').textContent = `${score} / 0`;
   timerInt=setInterval(()=>{
     left--; elapsed++; $('#timer').textContent = fmtTime(left); setProgress(elapsed, totalSeconds);
@@ -554,16 +556,7 @@ function renderQuestion(){
       box.appendChild(btn);
     });
   }else{
-    // Konfiguracja pod iOS/Android: brak atrybutu inputmode zapobiega kastrowaniu klawisza Enter.
-    // Zachowujemy czysty type="text" z wyłączeniem autokorekty dla tekstów niesłownikowych.
-    const inp=document.createElement('input'); 
-    inp.type='text'; 
-    inp.autocorrect='off';
-    inp.autocapitalize='off';
-    inp.spellcheck=false;
-    inp.placeholder='Wpisz wynik i Enter'; 
-    inp.autofocus=true;
-    
+    const inp=document.createElement('input'); inp.type='text'; inp.placeholder='Wpisz wynik i Enter'; inp.autofocus=true;
     inp.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ pickAnswer(inp.value.trim(), q.correct); }});
     box.appendChild(inp);
     setTimeout(()=>inp.focus(),10);
@@ -666,7 +659,7 @@ $('#showReviewBtn').addEventListener('click', ()=>{
   const box=$('#reviewList');
   if(review.length===0){ box.innerHTML='<div class="note">Brak danych.</div>'; }
   else { box.innerHTML = review.map((r,i)=>`<div class="review-item"><b>${i+1}.</b> ${r.q}<br><span class="note">Poprawna:</span> <b>${r.correct}</b></div>`).join(''); }
-  $('#reviewContainer').toggle('hidden');
+  $('#reviewContainer').classList.toggle('hidden');
 });
 
 // Init results
