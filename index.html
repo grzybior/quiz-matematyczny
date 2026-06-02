@@ -22,7 +22,7 @@ h1{font-size:22px;margin:0}
 .card{background:var(--card);border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,.08);padding:20px;margin-top:10px}
 .row{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin:10px 0}
 label{font-weight:600}
-input[type="text"], input[type="number"]{padding:10px 12px;border-radius:10px;border:1px solid var(--border);min-width:120px}
+input[type="text"], input[type="number"], input[type="tel"]{padding:10px 12px;border-radius:10px;border:1px solid var(--border);min-width:120px}
 .btn{padding:12px 18px;border:none;border-radius:999px;background:var(--btn);cursor:pointer;font-weight:700;box-shadow:0 6px 0 #f3be4a;transition:.15s}
 .btn:hover{background:var(--btn-hover)}
 .btn:active{transform:translateY(1px);box-shadow:0 5px 0 #f3be4a}
@@ -556,7 +556,21 @@ function renderQuestion(){
       box.appendChild(btn);
     });
   }else{
-    const inp=document.createElement('input'); inp.type='text'; inp.placeholder='Wpisz wynik i Enter'; inp.autofocus=true;
+    // Optymalna konfiguracja klawiatury numerycznej pod iPadOS/iOS
+    const inp=document.createElement('input'); 
+    inp.type='tel'; 
+    inp.inputMode='decimal'; 
+    inp.pattern='[0-9.,]*';
+    inp.autocorrect='off';
+    inp.spellcheck=false;
+    inp.placeholder='Wpisz wynik i Enter'; 
+    inp.autofocus=true;
+    
+    // Automatyczna zamiana przecinka na kropkę ułatwiająca obsługę ułamków na iPadzie
+    inp.addEventListener('input', () => {
+      inp.value = inp.value.replace(',', '.');
+    });
+
     inp.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ pickAnswer(inp.value.trim(), q.correct); }});
     box.appendChild(inp);
     setTimeout(()=>inp.focus(),10);
@@ -595,6 +609,7 @@ function pickAnswer(answer, correct){
   else { setProgress(elapsed, SETTINGS.challengeSeconds); setTimeout(nextChallenge, SETTINGS.delayMs); }
 }
 
+// (Reszta kodu logiki bez zmian)
 function nextOrFinishStandard(){
   currentQ++;
   if(currentQ>=QUIZ.length){ finishQuiz(false); }
