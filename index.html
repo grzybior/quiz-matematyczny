@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Quiz Matematyczny — dodawanie, odejmowanie, mnożenie, dzielenie (v3 — pamiętanie ustawień)</title>
+<title>Quiz Matematyczny — dodawanie, odejmowanie, mnożenie, dzielenie (v4 — odporna na cache)</title>
 <meta name="theme-color" content="#7dc4ff">
 <style>
 :root{
@@ -22,7 +22,8 @@ h1{font-size:22px;margin:0}
 .card{background:var(--card);border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,.08);padding:20px;margin-top:10px}
 .row{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin:10px 0}
 label{font-weight:600}
-input[type="text"], input[type="number"]{padding:10px 12px;border-radius:10px;border:1px solid var(--border);min-width:120px}
+/* font-size: 16px blokuje automatyczny zoom strony w Safari na urządzeniach Apple */
+input[type="text"], input[type="number"]{padding:10px 12px;border-radius:10px;border:1px solid var(--border);min-width:120px;font-size:16px}
 .btn{padding:12px 18px;border:none;border-radius:999px;background:var(--btn);cursor:pointer;font-weight:700;box-shadow:0 6px 0 #f3be4a;transition:.15s}
 .btn:hover{background:var(--btn-hover)}
 .btn:active{transform:translateY(1px);box-shadow:0 5px 0 #f3be4a}
@@ -205,7 +206,6 @@ const fmtTime = sec => { const m=Math.floor(sec/60), s=sec%60; return pad(m)+':'
 function shuffle(a){ const arr=a.slice(); for(let i=arr.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [arr[i],arr[j]]=[arr[j],arr[i]]; } return arr; }
 const round2 = x => Math.round(x*100)/100;
 
-// Parse time like "m:ss" or "ss"
 function parseTimeLike(val){
   if(typeof val !== 'string') val = String(val||'');
   val = val.trim();
@@ -231,23 +231,24 @@ function sWIN(){ tone(523,0.18,'triangle'); setTimeout(()=>tone(659,0.18,'triang
 // ===== State =====
 let SETTINGS = {
   ops: { add:true, sub:true, mul:true, div:true },
-  limit: 100,       // globalny limit wyniku dla + − × ÷
-  mulRange: 10,     // maks. czynnik dla × i iloraz/dzielnik dla ÷
-  numberType: 'int', // 'int' | 'frac'
-  answerMode: 'mc',  // 'mc' | 'input'
-  mode: 'standard',  // 'standard' | 'challenge'
+  limit: 100,       
+  mulRange: 10,     
+  numberType: 'int', 
+  answerMode: 'mc',  
+  mode: 'standard',  
   questionCount: 10,
   challengeSeconds: 60,
   delayMs: 1000
 };
 let currentQ = 0, score = 0, elapsed = 0, timerInt=null, playerName='';
-let QUIZ = []; // {text, correct, options?}
+let QUIZ = []; 
 let review = [];
-const STORAGE_KEY = 'math_quiz_results_v3_mmss';
-const STORAGE_LAST = 'math_quiz_last_state_v3';
+// Zmiana nazw kluczy (cache-busting dla localStorage)
+const STORAGE_KEY = 'math_quiz_results_v4_forced';
+const STORAGE_LAST = 'math_quiz_last_state_v4_forced';
 
-// ===== Results history (newest first) with sorting =====
-let sortKey='date'; // 'date'|'time'|'score'|'mode'
+// ===== Results history =====
+let sortKey='date'; 
 let sortDir='desc';
 
 function loadResults(){ try{ return JSON.parse(localStorage.getItem(STORAGE_KEY)||'[]'); }catch(e){ return []; } }
@@ -279,7 +280,6 @@ function renderResults(){
     return;
   }
   body.innerHTML = rows.map(r=>`<tr><td>${r.date}</td><td>${r.name}</td><td>${r.mode}</td><td>${r.score}/${r.total}</td><td>${r.time}</td></tr>`).join('');
-  // update sort indicators
   $$('.sort-ind').forEach(el=>el.textContent='');
   const ind=(sortDir==='asc')?'▲':'▼';
   const el=document.getElementById('sortInd-'+sortKey);
@@ -297,12 +297,9 @@ $('#clearResultsBtn').addEventListener('click', ()=>{
   if(confirm('Usunąć całą historię wyników?')){ clearResults(); renderResults(); }
 });
 
-// ===== Persistence (silent restore) =====
+// ===== Persistence =====
 function saveLastState(){
-  const state = {
-    playerName,
-    settings: SETTINGS
-  };
+  const state = { playerName, settings: SETTINGS };
   localStorage.setItem(STORAGE_LAST, JSON.stringify(state));
 }
 function loadLastState(){
@@ -314,45 +311,40 @@ function loadLastState(){
 }
 function applyStateToUI(state){
   if(!state) return;
-  // Player
   $('#playerName').value = state.playerName || '';
-  // Settings
-  if(state.settings){
-    SETTINGS = Object.assign({}, SETTINGS, state.settings);
-  }
-  // ops
+  if(state.settings){ SETTINGS = Object.assign({}, SETTINGS, state.settings); }
   $('#opAdd').checked = !!SETTINGS.ops.add;
   $('#opSub').checked = !!SETTINGS.ops.sub;
   $('#opMul').checked = !!SETTINGS.ops.mul;
   $('#opDiv').checked = !!SETTINGS.ops.div;
-  // limit chips
+  
   document.querySelectorAll('[data-range]').forEach(b=>b.classList.remove('active'));
-  const limitBtn = document.querySelector(`[button][data-range="${SETTINGS.limit}"]`) || document.querySelector(`[data-range="${SETTINGS.limit}"]`);
+  const limitBtn = document.querySelector(`[data-range="${SETTINGS.limit}"]`);
   if(limitBtn) limitBtn.classList.add('active'); else document.querySelector('[data-range]').classList.add('active');
-  // mulrange chips
+  
   document.querySelectorAll('[data-mulrange]').forEach(b=>b.classList.remove('active'));
   const mulBtn = document.querySelector(`[data-mulrange="${SETTINGS.mulRange}"]`);
   if(mulBtn) mulBtn.classList.add('active'); else document.querySelector('[data-mulrange]').classList.add('active');
-  // number type
+  
   document.querySelectorAll('[data-numtype]').forEach(b=>b.classList.remove('active'));
   const ntBtn = document.querySelector(`[data-numtype="${SETTINGS.numberType}"]`);
   if(ntBtn) ntBtn.classList.add('active');
-  // answer mode
+  
   document.querySelectorAll('[data-ans]').forEach(b=>b.classList.remove('active'));
   const aBtn = document.querySelector(`[data-ans="${SETTINGS.answerMode}"]`);
   if(aBtn) aBtn.classList.add('active');
-  // mode
+  
   document.querySelectorAll('[data-mode]').forEach(b=>b.classList.remove('active'));
   const mBtn = document.querySelector(`[data-mode="${SETTINGS.mode}"]`);
   if(mBtn) mBtn.classList.add('active');
   $('#standardControls').classList.toggle('hidden', SETTINGS.mode!=='standard');
   $('#challengeControls').classList.toggle('hidden', SETTINGS.mode!=='challenge');
-  // question count
+  
   document.querySelectorAll('[data-qcount]').forEach(b=>b.classList.toggle('active', parseInt(b.dataset.qcount,10)===SETTINGS.questionCount));
-  // challenge time
+  
   $('#challengeSeconds').value = fmtTime(SETTINGS.challengeSeconds||60);
   document.querySelectorAll('[data-ctime]').forEach(b=>b.classList.toggle('active', parseInt(b.dataset.ctime,10)===(SETTINGS.challengeSeconds||60)));
-  // delay
+  
   $('#delaySeconds').value = (SETTINGS.delayMs||1000)/1000;
 }
 
@@ -390,7 +382,6 @@ document.querySelectorAll('[data-mode]').forEach(btn=>{
     document.querySelectorAll('[data-mode]').forEach(b=>b.classList.remove('active'));
     btn.classList.add('active');
     SETTINGS.mode = btn.getAttribute('data-mode');
-    // toggle controls
     $('#standardControls').classList.toggle('hidden', SETTINGS.mode!=='standard');
     $('#challengeControls').classList.toggle('hidden', SETTINGS.mode!=='challenge');
   });
@@ -420,12 +411,7 @@ $('#challengeSeconds').addEventListener('change', ()=>{
 });
 ['opAdd','opSub','opMul','opDiv'].forEach(id=>{
   $('#'+id).addEventListener('change', ()=>{
-    SETTINGS.ops = {
-      add: $('#opAdd').checked,
-      sub: $('#opSub').checked,
-      mul: $('#opMul').checked,
-      div: $('#opDiv').checked
-    };
+    SETTINGS.ops = { add: $('#opAdd').checked, sub: $('#opSub').checked, mul: $('#opMul').checked, div: $('#opDiv').checked };
   });
 });
 $('#delaySeconds').addEventListener('change', ()=>{
@@ -444,36 +430,29 @@ function makeOperands(op, limit, type){
   while(true){
     tries++; if(tries>500) break;
     if(op==='mul'){
-      // Czynniki ograniczone mulRange; wynik dodatkowo ograniczony globalnym limit
       if(isInt){ a=randInt(0, SETTINGS.mulRange); b=randInt(0, SETTINGS.mulRange); }
       else { a=randStep(0, SETTINGS.mulRange, step); b=randStep(0, SETTINGS.mulRange, step); }
-      res = a*b;
-      if(res<=limit){ return [a,b,res]; }
+      res = a*b; if(res<=limit){ return [a,b,res]; }
     }else if(op==='div'){
-      // Dzielnik i wynik (iloraz) ograniczone mulRange; dzielna = dzielnik*iloraz, a <= globalny limit
       if(isInt){
-        b = randInt(1, Math.max(1, SETTINGS.mulRange));     // dzielnik
-        const k = randInt(0, SETTINGS.mulRange);             // iloraz (wynik)
-        a = b * k;                                          // dzielna
-        res = (b===0)?0:(a/b);
+        b = randInt(1, Math.max(1, SETTINGS.mulRange)); b==0?b=1:b;   
+        const k = randInt(0, SETTINGS.mulRange);             
+        a = b * k; res = a/b;
         if(a<=limit && b<=SETTINGS.mulRange && k<=SETTINGS.mulRange){ return [a,b,res]; }
       }else{
         b = randStep(0.1, SETTINGS.mulRange, step);
         const k = randStep(0, SETTINGS.mulRange, step);
-        a = b * k;
-        res = a/b;
+        a = b * k; res = a/b;
         if(a<=limit && b<=SETTINGS.mulRange && k<=SETTINGS.mulRange){ return [a,b,res]; }
       }
     }else if(op==='add'){
       if(isInt){ a=randInt(0, limit); b=randInt(0, limit); }
       else { a=randStep(0, limit, step); b=randStep(0, limit, step); }
-      res = a+b;
-      if(res>=0 && res<=limit){ return [a,b,res]; }
+      res = a+b; if(res>=0 && res<=limit){ return [a,b,res]; }
     }else if(op==='sub'){
       if(isInt){ a=randInt(0, limit); b=randInt(0, limit); if(a<b){ const t=a;a=b;b=t; } }
       else { a=randStep(0, limit, step); b=randStep(0, limit, step); if(a<b){ const t=a;a=b;b=t; } }
-      res = a-b;
-      if(res>=0 && res<=limit){ return [a,b,res]; }
+      res = a-b; if(res>=0 && res<=limit){ return [a,b,res]; }
     }
   }
   return [1,1,1];
@@ -492,18 +471,13 @@ function buildQuestion(limit, type, ops){
   return {op, a, b, text, correct};
 }
 function makeDistractors(correct, type, limit){
-  const c = parseFloat(correct);
-  const set = new Set();
+  const c = parseFloat(correct); const set = new Set();
   while(set.size<3){
     let delta;
     if(type==='int'){
-      delta = randInt(-10,10);
-      let v = Math.max(0, Math.min(limit, Math.round(c + delta)));
-      if(v!==c) set.add(String(v));
+      delta = randInt(-10,10); let v = Math.max(0, Math.min(limit, Math.round(c + delta))); if(v!==c) set.add(String(v));
     }else{
-      delta = (Math.random()<0.5? -1:1) * (Math.random()*5);
-      let v = Math.max(0, Math.min(limit, round2(c + delta)));
-      if(v!==c) set.add(String(v));
+      delta = (Math.random()<0.5? -1:1) * (Math.random()*5); let v = Math.max(0, Math.min(limit, round2(c + delta))); if(v!==c) set.add(String(v));
     }
   }
   return Array.from(set);
@@ -518,7 +492,6 @@ function buildQuiz(){
       QUIZ.push(q);
     }
   }else{
-    // challenge pool
     for(let i=0;i<1000;i++){
       const q = buildQuestion(SETTINGS.limit, SETTINGS.numberType, SETTINGS.ops);
       if(SETTINGS.answerMode==='mc'){ const wrongs = makeDistractors(q.correct, SETTINGS.numberType, SETTINGS.limit); q.options = shuffle([q.correct, ...wrongs]); }
@@ -531,9 +504,7 @@ function buildQuiz(){
 function setProgress(answered, total){ const pct = total>0 ? Math.round(100*answered/total) : 0; $('#progressFill').style.width = pct+'%'; }
 function startTimerStandard(){ elapsed=0; $('#timer').textContent='00:00'; timerInt=setInterval(()=>{ elapsed++; $('#timer').textContent=fmtTime(elapsed); },1000); }
 function startTimerChallenge(totalSeconds){
-  let left = totalSeconds; elapsed = 0; $('#timer').textContent = fmtTime(left);
-  // Inicjalny widok wyniku w trybie wyzwania
-  $('#score').textContent = `${score} / 0`;
+  let left = totalSeconds; elapsed = 0; $('#timer').textContent = fmtTime(left); $('#score').textContent = `${score} / 0`;
   timerInt=setInterval(()=>{
     left--; elapsed++; $('#timer').textContent = fmtTime(left); setProgress(elapsed, totalSeconds);
     if(left<=0){ clearInterval(timerInt); timerInt=null; finishQuiz(true); }
@@ -552,11 +523,19 @@ function renderQuestion(){
   if(SETTINGS.answerMode==='mc'){
     q.options.forEach(opt=>{
       const btn=document.createElement('button'); btn.textContent=opt;
-      btn.onclick=()=>pickAnswer(opt, q.correct);
-      box.appendChild(btn);
+      btn.onclick=()=>pickAnswer(opt, q.correct); box.appendChild(btn);
     });
   }else{
-    const inp=document.createElement('input'); inp.type='text'; inp.placeholder='Wpisz wynik i Enter'; inp.autofocus=true;
+    // Czyste, bezpieczne pole tekstowe dające GWARANCJĘ obecności klawisza Enter
+    const inp=document.createElement('input'); 
+    inp.type='text'; 
+    
+    // Trik wymuszający wyświetlenie paska numerycznego nad zwykłą klawiaturą w iOS i Androidzie
+    inp.setAttribute('autocomplete', 'one-time-code');
+    
+    inp.placeholder='Wpisz wynik i Enter'; 
+    inp.autofocus=true;
+    
     inp.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ pickAnswer(inp.value.trim(), q.correct); }});
     box.appendChild(inp);
     setTimeout(()=>inp.focus(),10);
@@ -564,12 +543,8 @@ function renderQuestion(){
 }
 
 function updateScoreBadge(){
-  if(SETTINGS.mode==='challenge'){
-    const answered = review.length;
-    $('#score').textContent = `${score} / ${answered}`;
-  }else{
-    $('#score').textContent = String(score);
-  }
+  if(SETTINGS.mode==='challenge'){ const answered = review.length; $('#score').textContent = `${score} / ${answered}`; }
+  else{ $('#score').textContent = String(score); }
 }
 
 function pickAnswer(answer, correct){
@@ -596,63 +571,43 @@ function pickAnswer(answer, correct){
 }
 
 function nextOrFinishStandard(){
-  currentQ++;
-  if(currentQ>=QUIZ.length){ finishQuiz(false); }
-  else { renderQuestion(); }
+  currentQ++; if(currentQ>=QUIZ.length){ finishQuiz(false); } else { renderQuestion(); }
 }
 function nextChallenge(){
-  currentQ++;
-  if(currentQ>=QUIZ.length){ currentQ=0; } // recykling puli
-  renderQuestion();
+  currentQ++; if(currentQ>=QUIZ.length){ currentQ=0; } renderQuestion();
 }
 
 function finishQuiz(){
   stopTimer();
   const total = (SETTINGS.mode==='standard') ? QUIZ.length : review.length;
-  const name = playerName || 'Anon';
-  const t = fmtTime(elapsed);
+  const name = playerName || 'Anon'; const t = fmtTime(elapsed);
   const modeLabel = (SETTINGS.mode==='standard') ? 'Standard' : 'Wyzwanie';
   $('#summaryText').textContent = `${name} — ${modeLabel}: ${score}/${total} poprawnych, czas ${t}`;
-  $('#quizCard').classList.add('hidden');
-  $('#summaryCard').classList.remove('hidden');
+  $('#quizCard').classList.add('hidden'); $('#summaryCard').classList.remove('hidden');
   const now = new Date();
   saveResult({iso: now.toISOString(), date: now.toLocaleString(), name, mode: modeLabel, score, total, time: t});
-  renderResults();
-  sWIN();
+  renderResults(); sWIN();
 }
 
 function startGame(){
-  playerName = $('#playerName').value.trim();
-  if(!playerName){ alert('Podaj imię gracza 🙂'); return; }
+  playerName = $('#playerName').value.trim(); if(!playerName){ alert('Podaj imię gracza 🙂'); return; }
   const anyOps = $('#opAdd').checked || $('#opSub').checked || $('#opMul').checked || $('#opDiv').checked;
   if(!anyOps){ alert('Zaznacz przynajmniej jedno działanie.'); return; }
-
   SETTINGS.ops = { add: $('#opAdd').checked, sub: $('#opSub').checked, mul: $('#opMul').checked, div: $('#opDiv').checked };
-  // Persist last state right before starting
   saveLastState();
-
-  buildQuiz();
-  currentQ=0; score=0; review=[];
-
-  $('#startCard').classList.add('hidden');
-  $('#summaryCard').classList.add('hidden');
-  $('#quizCard').classList.remove('hidden');
+  buildQuiz(); currentQ=0; score=0; review=[];
+  $('#startCard').classList.add('hidden'); $('#summaryCard').classList.add('hidden'); $('#quizCard').classList.remove('hidden');
   updateScoreBadge();
   setProgress(0, (SETTINGS.mode==='standard') ? SETTINGS.questionCount : SETTINGS.challengeSeconds);
   renderQuestion();
-  if(SETTINGS.mode==='standard'){ startTimerStandard(); }
-  else { startTimerChallenge(SETTINGS.challengeSeconds); }
+  if(SETTINGS.mode==='standard'){ startTimerStandard(); } else { startTimerChallenge(SETTINGS.challengeSeconds); }
   ensureAudio();
 }
 
 $('#startBtn').addEventListener('click', startGame);
 $('#playAgainBtn').addEventListener('click', ()=>{
-  // Return to start with last settings applied, no auto-start
-  stopTimer();
-  const st = loadLastState();
-  $('#quizCard').classList.add('hidden');
-  $('#summaryCard').classList.add('hidden');
-  $('#startCard').classList.remove('hidden');
+  stopTimer(); const st = loadLastState();
+  $('#quizCard').classList.add('hidden'); $('#summaryCard').classList.add('hidden'); $('#startCard').classList.remove('hidden');
   applyStateToUI(st);
 });
 $('#showReviewBtn').addEventListener('click', ()=>{
@@ -662,9 +617,7 @@ $('#showReviewBtn').addEventListener('click', ()=>{
   $('#reviewContainer').classList.toggle('hidden');
 });
 
-// Init results
 renderResults();
-// Restore last settings silently
 applyStateToUI(loadLastState());
 </script>
 </body>
